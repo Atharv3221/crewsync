@@ -1,0 +1,68 @@
+.editor {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    min-height: 0;
+    padding: 8px 24px 0;
+}
+
+.editor-text {
+    flex: 1;
+    width: 100%;
+    max-width: 820px;
+    padding: 56px 64px;
+    background: var(--surface);
+    color: var(--text);
+    border: none;
+    border-radius: 14px 14px 0 0;
+    box-shadow: var(--sheet-shadow);
+    outline: none;
+    resize: none;
+    font-family: var(--font-text);
+    font-size: 15px;
+    line-height: 1.75;
+    tab-size: 4;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+.editor-text::placeholder {
+    color: var(--muted);
+    opacity: 0.7;
+}
+
+.editor-status {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 820px;
+    padding: 10px 4px 14px;
+    color: var(--muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.editor-status .pending {
+    color: var(--connecting);
+    font-weight: 500;
+}
+
+/* phones */
+@media (max-width: 640px) {
+    .editor {
+        padding: 0;
+    }
+
+    .editor-text {
+        padding: 20px 16px;
+        border-radius: 0;
+        box-shadow: none;
+        border-top: 1px solid var(--border);
+        font-size: 16px;
+    }
+
+    .editor-status {
+        padding: 8px 16px;
+    }
+}

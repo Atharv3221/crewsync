@@ -1,0 +1,70 @@
+/* ---------- tokens ---------- */
+:root {
+    --bg: #f3f1ec;
+    --surface: #ffffff;
+    --sheet-shadow: 0 1px 2px rgb(30 25 15 / 0.06), 0 8px 32px rgb(30 25 15 / 0.08);
+    --text: #1d1c1a;
+    --muted: #7a756c;
+    --border: #e4e0d6;
+    --accent: #e8572f;
+    --accent-text: #ffffff;
+    --online: #2f9e5b;
+    --connecting: #d9902b;
+    --offline: #d94841;
+    --radius: 10px;
+    --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-text: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #111113;
+        --surface: #1b1b1f;
+        --sheet-shadow: 0 0 0 1px #26262b, 0 12px 40px rgb(0 0 0 / 0.45);
+        --text: #ecebe8;
+        --muted: #9b968d;
+        --border: #2a2a30;
+        --accent: #ff7a52;
+        --accent-text: #1b1b1f;
+    }
+}
+
+/* ---------- base ---------- */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui), serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea {
+    font: inherit;
+    color: inherit;
+}
+
+::selection {
+    background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* ---------- page layout ---------- */
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+}
