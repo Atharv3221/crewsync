@@ -2,7 +2,7 @@
 
 Real-time collaborative text editor built on a hand-written RGA CRDT, with a Spring Boot server that sequences, stores and relays ops.
 
-**Live:** `<add link>`
+**Live:** [crewsync-ten.vercel.app](https://crewsync-ten.vercel.app)
 
 ![Document list](docs/page1.png)
 ![Editor](docs/page2.png)
