@@ -2,6 +2,8 @@ package github.atharv3221.crewsync.common;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -14,6 +16,24 @@ public class ApiExceptionHandler {
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ApiError handleNotFound(NotFoundException exception) {
     return ApiError.of(HttpStatus.NOT_FOUND, exception.getMessage());
+  }
+
+  @ExceptionHandler(ConflictException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ApiError handleConflict(ConflictException exception) {
+    return ApiError.of(HttpStatus.CONFLICT, exception.getMessage());
+  }
+
+  @ExceptionHandler(AuthenticationException.class)
+  @ResponseStatus(HttpStatus.UNAUTHORIZED)
+  public ApiError handleAuthentication(AuthenticationException exception) {
+    return ApiError.of(HttpStatus.UNAUTHORIZED, exception.getMessage());
+  }
+
+  @ExceptionHandler(AccessDeniedException.class)
+  @ResponseStatus(HttpStatus.FORBIDDEN)
+  public ApiError handleAccessDenied(AccessDeniedException exception) {
+    return ApiError.of(HttpStatus.FORBIDDEN, exception.getMessage());
   }
 
   @ExceptionHandler(IllegalArgumentException.class)

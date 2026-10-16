@@ -1,17 +1,35 @@
 import { Rga, type Op } from "../crdt";
+import { ApiError, getDoc } from "../lib/api";
 import { createSiteId } from "../lib/identity";
-import { Connection, socketUrl, type ConnectionStatus } from "./connection";
-import { PresenceTracker, type Peer } from "./presence";
-import type { ServerMessage } from "./protocol";
+import {
+  ACCESS_REVOKED_CLOSE_CODE,
+  Connection,
+  socketUrl,
+  type ConnectionStatus,
+} from "./connection";
+import { PresenceTracker, type Peer, type RemoteCursor } from "./presence";
+import type { SequencedOp, ServerMessage } from "./protocol";
 import { SyncTracker } from "./syncTracker";
 import { TextareaBinding } from "./textareaBinding";
+
+/**
+ * Why the client stopped for good: removed from the doc, the doc is gone, or the session expired
+ * (the api layer has already sent the user to the login page).
+ */
+export type AccessLoss = "forbidden" | "missing" | "unauthorized";
 
 /** Represents a snapshot of the current collaboration state, sent to UI callbacks on updates. */
 export interface CollabSnapshot {
   readonly status: ConnectionStatus;
+  readonly accessLost: AccessLoss | null;
   readonly peers: readonly Peer[];
+  readonly cursors: readonly RemoteCursor[];
   readonly unsynced: number;
   readonly length: number;
+  readonly text: string;
+  /** The newest title heard from the server, or null until a rename or access check reports one. */
+  readonly title: string | null;
+  readonly titleVersion: number;
 }
 
 /** Configuration options required to initialize a collaboration client. */
@@ -19,6 +37,7 @@ export interface CollabOptions {
   readonly docId: string;
   readonly userId: string;
   readonly name: string;
+  readonly token: string;
   readonly onChange: (snapshot: CollabSnapshot) => void;
 }
 
@@ -27,6 +46,19 @@ const HEARTBEAT_MS = 3_000;
 
 /** Minimum delay in milliseconds between throttled presence/cursor updates. */
 const PRESENCE_THROTTLE_MS = 150;
+
+const LOSS_BY_STATUS: ReadonlyMap<number, AccessLoss> = new Map([
+  [401, "unauthorized"],
+  [403, "forbidden"],
+  [404, "missing"],
+]);
+
+/** The access loss a failed access check means, or null for errors worth retrying. */
+function lossFor(error: unknown): AccessLoss | null {
+  return error instanceof ApiError
+    ? (LOSS_BY_STATUS.get(error.status) ?? null)
+    : null;
+}
 
 /**
  * Orchestrates real-time document collaboration, managing CRDT synchronization,
@@ -43,6 +75,9 @@ export class CollabClient {
 
   private name: string;
   private status: ConnectionStatus = "connecting";
+  private accessLost: AccessLoss | null = null;
+  private title: string | null = null;
+  private titleVersion = -1;
   private disposed = false;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private presenceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -57,13 +92,19 @@ export class CollabClient {
     this.doc = new Rga(this.site);
     this.binding = new TextareaBinding(this.doc);
     this.presence = new PresenceTracker(options.userId);
-    this.connection = new Connection(socketUrl(options.docId), {
+    this.connection = new Connection(socketUrl(options.docId, options.token), {
       onOpen: () => this.handleOpen(),
       onMessage: (message) => this.handleMessage(message),
       onStatus: (status) => {
         this.status = status;
         this.emit();
       },
+      onClose: (code) => {
+        if (code === ACCESS_REVOKED_CLOSE_CODE) {
+          this.loseAccess("forbidden");
+        }
+      },
+      beforeReconnect: () => this.checkAccess(),
     });
   }
 
@@ -83,9 +124,41 @@ export class CollabClient {
   /** Cleans up all resources, clears active timers, and closes the network connection. */
   dispose(): void {
     this.disposed = true;
+    this.stop();
+  }
+
+  private stop(): void {
     if (this.heartbeatTimer !== null) clearInterval(this.heartbeatTimer);
     if (this.presenceTimer !== null) clearTimeout(this.presenceTimer);
     this.connection.close();
+  }
+
+  // ---------- access ----------
+
+  /**
+   * Asks the API whether the doc is still ours before reconnecting. Access errors stop the client;
+   * anything else (network down, server error) resolves false so the backoff continues.
+   */
+  private async checkAccess(): Promise<boolean> {
+    let ready = false;
+    try {
+      const doc = await getDoc(this.options.docId);
+      this.updateTitle(doc.title, doc.titleVersion);
+      ready = true;
+    } catch (error) {
+      const loss = lossFor(error);
+      if (loss !== null) {
+        this.loseAccess(loss);
+      }
+    }
+    return ready;
+  }
+
+  /** Stops reconnecting for good and tells the UI why. */
+  private loseAccess(loss: AccessLoss): void {
+    this.accessLost = loss;
+    this.stop();
+    this.emit();
   }
 
   /**
@@ -94,6 +167,26 @@ export class CollabClient {
    */
   attach(textarea: HTMLTextAreaElement | null): void {
     this.binding.attach(textarea);
+  }
+
+  /**
+   * Shows a title this user just saved, unless a newer one has already arrived: the HTTP reply and
+   * the broadcasts travel separately, so they can come in either order.
+   */
+  setTitle(title: string, version: number): void {
+    if (this.updateTitle(title, version)) {
+      this.emit();
+    }
+  }
+
+  /** Keeps the title with the highest version; returns whether it changed. */
+  private updateTitle(title: string, version: number): boolean {
+    const newer = version > this.titleVersion;
+    if (newer) {
+      this.title = title;
+      this.titleVersion = version;
+    }
+    return newer;
   }
 
   /**
@@ -150,9 +243,9 @@ export class CollabClient {
     this.sendPresence();
   }
 
-  /** Tells the server who we are and the last sequence number we've seen, so it can replay what we missed. */
+  /** Tells the server the last sequence number we've seen, so it can replay what we missed. */
   private sendHello(): void {
-    this.connection.send({ type: "hello", site: this.site, lastSeq: this.sync.lastSeq });
+    this.connection.send({ type: "hello", lastSeq: this.sync.lastSeq });
   }
 
   /**
@@ -163,26 +256,34 @@ export class CollabClient {
     switch (message.type) {
       case "init":
         this.receiveOps(message.ops);
-        this.sync.advance(message.seq);
         break;
       case "op":
         if (this.sync.hasGapBefore(message.seq)) {
           this.sendHello();
         }
-        this.receiveOps([message.op]);
-        this.sync.advance(message.seq);
+        this.receiveOps([message]);
         break;
       case "presence":
         this.presence.receive(message, Date.now());
+        break;
+      case "title":
+        this.updateTitle(message.title, message.version);
+        break;
+      case "leave":
+        this.presence.removeUser(message.userId);
         break;
     }
     this.emit();
   }
 
-  /** Confirms local operations and applies remote operations to the document text binding. */
-  private receiveOps(ops: readonly Op[]): void {
+  /** Confirms local operations, applies remote ones to the text binding and advances lastSeq. */
+  private receiveOps(entries: readonly SequencedOp[]): void {
+    const ops = entries.map((entry) => entry.op);
     this.sync.confirm(ops);
     this.binding.applyRemote(ops);
+    for (const entry of entries) {
+      this.sync.advance(entry.seq);
+    }
   }
 
   // ---------- presence ----------
@@ -215,9 +316,14 @@ export class CollabClient {
     if (!this.disposed) {
       this.options.onChange({
         status: this.status,
+        accessLost: this.accessLost,
         peers: this.presence.peers(this.doc),
+        cursors: this.presence.cursors(this.doc),
         unsynced: this.sync.unsynced,
         length: this.doc.length,
+        text: this.doc.text(),
+        title: this.title,
+        titleVersion: this.titleVersion,
       });
     }
   }

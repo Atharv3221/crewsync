@@ -12,11 +12,6 @@ public class UserService {
 
   private final UserRepository userRepository;
 
-  @Transactional
-  public User create(String name) {
-    return userRepository.save(new User(name));
-  }
-
   @Transactional(readOnly = true)
   public User get(UUID id) {
     return userRepository.findById(id).orElseThrow(() -> new NotFoundException("User", id));

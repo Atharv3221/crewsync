@@ -12,7 +12,8 @@ public interface OpLog {
   /**
    * Stores {@code op} under {@code seq} unless an op with the same key was already stored.
    *
-   * @return false when the op is a duplicate and nothing was stored
+   * @return the op as stored: the new one under {@code seq}, or the earlier one with its
+   *     original seq when {@code op} is a duplicate
    */
-  boolean append(UUID docId, long seq, ClientOp op);
+  SequencedOp append(UUID docId, long seq, ClientOp op);
 }

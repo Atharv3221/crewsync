@@ -1,9 +1,16 @@
-import type { RefObject } from "react";
-import type { CollabHandlers, CollabSnapshot, ConnectionStatus } from "../collab";
+import { useLayoutEffect, useRef, type RefObject } from "react";
+import type {
+  CollabHandlers,
+  CollabSnapshot,
+  ConnectionStatus,
+} from "../collab";
+import { RemoteCursors } from "./RemoteCursors";
 import "./Editor.css";
 
-interface EditorProps
-  extends Pick<CollabSnapshot, "length" | "unsynced" | "status"> {
+interface EditorProps extends Pick<
+  CollabSnapshot,
+  "length" | "unsynced" | "status" | "text" | "cursors"
+> {
   readonly textareaRef: RefObject<HTMLTextAreaElement | null>;
   readonly handlers: CollabHandlers;
 }
@@ -25,21 +32,37 @@ export function Editor({
   length,
   unsynced,
   status,
+  text,
+  cursors,
 }: EditorProps) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // The overlay can't scroll on its own; keep it aligned with the textarea.
+  const syncScroll = (): void => {
+    if (overlayRef.current !== null && textareaRef.current !== null) {
+      overlayRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
+  useLayoutEffect(syncScroll);
+
   return (
     <main className="editor">
-      <textarea
-        ref={textareaRef}
-        className="editor-text"
-        aria-label="Document text"
-        placeholder="Start typing… then share the link to edit together."
-        spellCheck={false}
-        autoFocus
-        onInput={handlers.onInput}
-        onSelect={handlers.onSelect}
-        onCompositionStart={handlers.onCompositionStart}
-        onCompositionEnd={handlers.onCompositionEnd}
-      />
+      <div className="editor-sheet">
+        <textarea
+          ref={textareaRef}
+          className="editor-text editor-metrics"
+          aria-label="Document text"
+          placeholder="Start typing… then share the link to edit together."
+          spellCheck={false}
+          autoFocus
+          onInput={handlers.onInput}
+          onSelect={handlers.onSelect}
+          onCompositionStart={handlers.onCompositionStart}
+          onCompositionEnd={handlers.onCompositionEnd}
+          onScroll={syncScroll}
+        />
+        <RemoteCursors ref={overlayRef} text={text} cursors={cursors} />
+      </div>
       <footer className="editor-status">
         <span>{length} characters</span>
         <span className={unsynced > 0 ? "pending" : undefined}>

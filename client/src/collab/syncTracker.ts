@@ -24,7 +24,7 @@ export class SyncTracker {
   }
 
   /**
-   * Adds a local operation to the outbox to be tracked until confirmed by the server.
+   * Adds a local operation to the outbox, keyed by the op's own id, until the server echoes it.
    * @param op - The operation to track.
    */
   track(op: Op): void {
@@ -33,7 +33,7 @@ export class SyncTracker {
 
   /**
    * Marks operations as confirmed by removing them from the outbox.
-   * Our own ops echoed back by the server are confirmed; others' ops are ignored.
+   * Our own ops echoed back by the server match by their own id; others' ops are ignored.
    * @param ops - The list of operations confirmed by the server.
    */
   confirm(ops: readonly Op[]): void {

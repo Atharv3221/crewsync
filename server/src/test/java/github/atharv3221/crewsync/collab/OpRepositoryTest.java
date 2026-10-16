@@ -1,5 +1,6 @@
 package github.atharv3221.crewsync.collab;
 
+import static github.atharv3221.crewsync.user.TestUsers.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -26,7 +27,7 @@ class OpRepositoryTest {
 
   @BeforeEach
   void setUp() {
-    User user = entityManager.persist(new User("Ada"));
+    User user = entityManager.persist(user("Ada"));
     document = entityManager.persist(new Document("Notes", user));
     otherDocument = entityManager.persist(new Document("Other", user));
   }
@@ -68,7 +69,7 @@ class OpRepositoryTest {
     opRepository.saveAndFlush(new Op(document, 1, "insert:1@a", "{}"));
     opRepository.saveAndFlush(new Op(otherDocument, 1, "insert:1@a", "{}"));
 
-    assertThat(opRepository.existsByDocumentIdAndOpKey(otherDocument.getId(), "insert:1@a")).isTrue();
+    assertThat(opRepository.findByDocumentIdAndOpKey(otherDocument.getId(), "insert:1@a")).isPresent();
   }
 
   @Test

@@ -3,6 +3,9 @@ package github.atharv3221.crewsync.collab;
 import static github.atharv3221.crewsync.collab.TestSessions.JSON;
 import static github.atharv3221.crewsync.collab.TestSessions.openSession;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -38,6 +41,28 @@ class RoomRegistryTest {
     registry.leave(docId, "alice");
 
     assertThat(registry.enter(docId, alice)).isSameAs(room);
+  }
+
+  @Test
+  void evictClosesOnlyTheRemovedUsersSessionsWith4403() throws Exception {
+    UUID removedId = UUID.randomUUID();
+    WebSocketSession keeper = openSession("keeper", UUID.randomUUID());
+    WebSocketSession removed = openSession("removed", removedId);
+    registry.enter(docId, keeper);
+    registry.enter(docId, removed);
+
+    registry.evict(docId, removedId);
+
+    verify(removed).close(RoomRegistry.ACCESS_REVOKED);
+    verify(keeper, never()).close(any());
+    assertThat(RoomRegistry.ACCESS_REVOKED.getCode()).isEqualTo(4403);
+  }
+
+  @Test
+  void evictWithoutAnOpenRoomDoesNothing() {
+    registry.evict(UUID.randomUUID(), UUID.randomUUID());
+
+    assertThat(opLog.maxSeqLoads()).isZero();
   }
 
   @Test

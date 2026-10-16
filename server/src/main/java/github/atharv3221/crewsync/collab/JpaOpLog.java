@@ -30,11 +30,10 @@ public class JpaOpLog implements OpLog {
 
   @Override
   @Transactional
-  public boolean append(UUID docId, long seq, ClientOp op) {
-    boolean fresh = !opRepository.existsByDocumentIdAndOpKey(docId, op.key());
-    if (fresh) {
-      opRepository.save(new Op(documentRepository.getReferenceById(docId), seq, op.key(), op.json()));
-    }
-    return fresh;
+  public SequencedOp append(UUID docId, long seq, ClientOp op) {
+    Op stored = opRepository.findByDocumentIdAndOpKey(docId, op.key())
+        .orElseGet(() -> opRepository.save(
+            new Op(documentRepository.getReferenceById(docId), seq, op.key(), op.json())));
+    return new SequencedOp(stored.getSeq(), stored.getOpJson());
   }
 }

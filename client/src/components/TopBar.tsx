@@ -1,12 +1,22 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { CollabSnapshot, ConnectionStatus, Peer } from "../collab";
-import { newDocId } from "../lib/identity";
+import type { Doc, User } from "../lib/api";
+import { routeHash } from "../lib/routes";
+import { DocTitle } from "./DocTitle";
+import { SharePanel } from "./SharePanel";
+import { UserMenu } from "./UserMenu";
+import { useDismiss } from "./useDismiss";
 import "./TopBar.css";
 
 interface TopBarProps extends Pick<CollabSnapshot, "peers" | "status"> {
-  readonly docId: string;
-  readonly name: string;
-  readonly onRename: (name: string) => void;
+  readonly doc: Doc;
+  readonly user: User;
+  /** The live title; it can differ from `doc.title` once anyone renames the doc. */
+  readonly title: string;
+  readonly onRenameDoc: (title: string) => Promise<void>;
+  readonly onRename: (name: string) => Promise<void>;
+  readonly onLogout: () => void;
+  readonly onNewDoc: () => Promise<void>;
 }
 
 const STATUS_LABEL: Record<ConnectionStatus, string> = {
@@ -14,22 +24,6 @@ const STATUS_LABEL: Record<ConnectionStatus, string> = {
   online: "Live",
   offline: "Offline · will sync on reconnect",
 };
-
-const COPIED_MS = 1_500;
-
-/** Copies with the Clipboard API; returns false where it isn't available (plain http). */
-async function copyText(text: string): Promise<boolean> {
-  let copied = false;
-  if (window.isSecureContext && navigator.clipboard !== undefined) {
-    try {
-      await navigator.clipboard.writeText(text);
-      copied = true;
-    } catch {
-      copied = false;
-    }
-  }
-  return copied;
-}
 
 function initial(name: string): string {
   return name.trim().charAt(0).toUpperCase() || "?";
@@ -40,39 +34,34 @@ function peerTitle(peer: Peer): string {
   return `${peer.name} · line ${peer.line}${tabs}`;
 }
 
-/** Logo, document id, people present, connection status, name, share and new-doc actions. */
-export function TopBar({ docId, name, onRename, peers, status }: TopBarProps) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  const commitName = (): void => {
-    if (draft !== null && draft.trim() !== "") {
-      onRename(draft);
-    }
-    setDraft(null);
-  };
-
-  const share = async (): Promise<void> => {
-    const url = location.href;
-    if (await copyText(url)) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), COPIED_MS);
-    } else {
-      window.prompt("Copy this link:", url);
-    }
-  };
-
-  const newDoc = (): void => {
-    location.hash = newDocId();
-  };
+/** Logo, document title, people present, connection status, share, new doc and the user menu. */
+export function TopBar({
+  doc,
+  user,
+  title,
+  onRenameDoc,
+  onRename,
+  onLogout,
+  onNewDoc,
+  peers,
+  status,
+}: TopBarProps) {
+  const [sharing, setSharing] = useState(false);
+  const shareRef = useRef<HTMLDivElement>(null);
+  const closeShare = useCallback(() => setSharing(false), []);
+  useDismiss(shareRef, sharing, closeShare);
 
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <span className="logo">Crewrite</span>
-        <span className="doc-id" title="Document ID">
-          #{docId}
-        </span>
+        <a className="logo" href={routeHash({ page: "home" })} title="My docs">
+          Crewrite
+        </a>
+        <DocTitle
+          title={title}
+          editable={doc.role === "OWNER"}
+          onRename={onRenameDoc}
+        />
       </div>
 
       <div className="topbar-right">
@@ -94,27 +83,27 @@ export function TopBar({ docId, name, onRename, peers, status }: TopBarProps) {
           {STATUS_LABEL[status]}
         </span>
 
-        <input
-          className="name-input"
-          aria-label="Your name"
-          maxLength={32}
-          value={draft ?? name}
-          onFocus={() => setDraft(name)}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={commitName}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.currentTarget.blur();
-            }
-          }}
-        />
-
-        <button type="button" onClick={() => void share()}>
-          {copied ? "Copied!" : "Share"}
-        </button>
-        <button type="button" onClick={newDoc}>
+        <div className="share" ref={shareRef}>
+          <button
+            type="button"
+            className="primary"
+            aria-expanded={sharing}
+            onClick={() => setSharing(!sharing)}
+          >
+            Share
+          </button>
+          {sharing && (
+            <SharePanel
+              docId={doc.id}
+              role={doc.role}
+              currentUserId={user.id}
+            />
+          )}
+        </div>
+        <button type="button" onClick={() => void onNewDoc()}>
           New doc
         </button>
+        <UserMenu user={user} onRename={onRename} onLogout={onLogout} />
       </div>
     </header>
   );

@@ -7,24 +7,80 @@
     padding: 8px 24px 0;
 }
 
-.editor-text {
+.editor-sheet {
+    position: relative;
+    display: flex;
     flex: 1;
     width: 100%;
     max-width: 820px;
+    min-height: 0;
+}
+
+/* Shared by the textarea and the caret overlay: any difference here misplaces remote carets. */
+.editor-metrics {
+    margin: 0;
     padding: 56px 64px;
-    background: var(--surface);
-    color: var(--text);
     border: none;
-    border-radius: 14px 14px 0 0;
-    box-shadow: var(--sheet-shadow);
-    outline: none;
-    resize: none;
     font-family: var(--font-text);
     font-size: 15px;
     line-height: 1.75;
     tab-size: 4;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: normal;
+    scrollbar-gutter: stable;
     scrollbar-width: thin;
+}
+
+.editor-text {
+    flex: 1;
+    width: 100%;
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 14px 14px 0 0;
+    box-shadow: var(--sheet-shadow);
+    outline: none;
+    resize: none;
+    overflow-y: auto;
     scrollbar-color: var(--border) transparent;
+}
+
+.remote-cursors {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    color: transparent;
+    pointer-events: none;
+    scrollbar-color: transparent transparent;
+}
+
+/* A zero-width inline marker; --caret is the peer's colour. */
+.remote-caret {
+    position: relative;
+}
+
+.remote-caret::before {
+    content: "";
+    position: absolute;
+    top: -0.2em;
+    left: -1px;
+    height: 1.4em;
+    border-left: 2px solid var(--caret);
+}
+
+.remote-caret-label {
+    position: absolute;
+    bottom: calc(1.2em - 1px);
+    left: -1px;
+    padding: 1px 5px;
+    border-radius: 4px 4px 4px 0;
+    background: var(--caret);
+    color: #fff;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 
 .editor-text::placeholder {
@@ -54,12 +110,19 @@
         padding: 0;
     }
 
-    .editor-text {
+    .editor-metrics {
         padding: 20px 16px;
+        font-size: 16px;
+    }
+
+    .editor-text {
         border-radius: 0;
         box-shadow: none;
         border-top: 1px solid var(--border);
-        font-size: 16px;
+    }
+
+    .remote-cursors {
+        border-top: 1px solid transparent;
     }
 
     .editor-status {

@@ -1,15 +1,15 @@
 package github.atharv3221.crewsync.collab;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 
 class InMemoryOpLog implements OpLog {
 
   private final List<SequencedOp> ops = new ArrayList<>();
-  private final Set<String> keys = new HashSet<>();
+  private final Map<String, SequencedOp> keys = new HashMap<>();
   private int maxSeqLoads;
 
   @Override
@@ -24,12 +24,14 @@ class InMemoryOpLog implements OpLog {
   }
 
   @Override
-  public boolean append(UUID docId, long seq, ClientOp op) {
-    boolean fresh = keys.add(op.key());
-    if (fresh) {
-      ops.add(new SequencedOp(seq, op.json()));
+  public SequencedOp append(UUID docId, long seq, ClientOp op) {
+    SequencedOp stored = keys.get(op.key());
+    if (stored == null) {
+      stored = new SequencedOp(seq, op.json());
+      keys.put(op.key(), stored);
+      ops.add(stored);
     }
-    return fresh;
+    return stored;
   }
 
   List<SequencedOp> stored() {

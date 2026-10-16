@@ -1,5 +1,6 @@
 package github.atharv3221.crewsync.collab;
 
+import static github.atharv3221.crewsync.collab.JsonFields.requireNonEmptyString;
 import static github.atharv3221.crewsync.collab.JsonFields.requireNonNegativeLong;
 import static github.atharv3221.crewsync.collab.JsonFields.requireObject;
 import static github.atharv3221.crewsync.collab.JsonFields.requireString;
@@ -32,7 +33,7 @@ public record ClientOp(String key, JsonNode body) {
   }
 
   private static void requireInsertFields(JsonNode op) {
-    requireString(op, "value", MAX_VALUE_LENGTH);
+    requireNonEmptyString(op, "value", MAX_VALUE_LENGTH);
     if (!op.path("origin").isNull()) {
       requireCharId(requireObject(op.get("origin"), "origin"));
     }

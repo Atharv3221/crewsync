@@ -1,5 +1,6 @@
 package github.atharv3221.crewsync.document;
 
+import static github.atharv3221.crewsync.user.TestUsers.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
@@ -12,7 +13,7 @@ class DocMemberTest {
 
   private final UUID docId = UUID.randomUUID();
   private final UUID userId = UUID.randomUUID();
-  private final User user = withId(new User("Ada"), userId);
+  private final User user = withId(user("Ada"), userId);
   private final Document document = withId(new Document("Notes", user), docId);
 
   @Test
@@ -55,7 +56,7 @@ class DocMemberTest {
   @Test
   void requiresSavedDocumentAndUser() {
     Document unsavedDocument = new Document("Draft", user);
-    User unsavedUser = new User("Grace");
+    User unsavedUser = user("Grace");
 
     assertThatIllegalArgumentException()
         .isThrownBy(() -> new DocMember(unsavedDocument, user, DocRole.OWNER));

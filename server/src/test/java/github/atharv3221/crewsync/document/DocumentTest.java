@@ -1,5 +1,6 @@
 package github.atharv3221.crewsync.document;
 
+import static github.atharv3221.crewsync.user.TestUsers.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
@@ -14,7 +15,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 class DocumentTest {
 
-  private final User creator = new User("Ada");
+  private final User creator = user("Ada");
 
   @Test
   void cleansTitle() {
@@ -33,6 +34,26 @@ class DocumentTest {
     String tooLong = "t".repeat(Document.MAX_TITLE_LENGTH + 1);
 
     assertThatIllegalArgumentException().isThrownBy(() -> new Document(tooLong, creator));
+  }
+
+  @Test
+  void renameCleansTitleAndFallsBackToDefault() {
+    Document document = new Document("Notes", creator);
+
+    document.rename("  Q4   plan ");
+    assertThat(document.getTitle()).isEqualTo("Q4 plan");
+
+    document.rename("   ");
+    assertThat(document.getTitle()).isEqualTo(Document.DEFAULT_TITLE);
+  }
+
+  @Test
+  void renameRejectsOverlongTitleAndKeepsTheOldOne() {
+    Document document = new Document("Notes", creator);
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> document.rename("t".repeat(Document.MAX_TITLE_LENGTH + 1)));
+    assertThat(document.getTitle()).isEqualTo("Notes");
   }
 
   @Test

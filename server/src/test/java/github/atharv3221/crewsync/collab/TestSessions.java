@@ -7,7 +7,10 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -25,6 +28,15 @@ final class TestSessions {
     WebSocketSession session = mock(WebSocketSession.class);
     when(session.getId()).thenReturn(id);
     when(session.isOpen()).thenReturn(true);
+    return session;
+  }
+
+  /** An open session authenticated as {@code userId}, as the handshake would leave it. */
+  static WebSocketSession openSession(String id, UUID userId) {
+    WebSocketSession session = openSession(id);
+    Map<String, Object> attributes = new HashMap<>();
+    attributes.put(DocHandshakeInterceptor.USER_ATTRIBUTE, new SessionUser(userId, id));
+    when(session.getAttributes()).thenReturn(attributes);
     return session;
   }
 

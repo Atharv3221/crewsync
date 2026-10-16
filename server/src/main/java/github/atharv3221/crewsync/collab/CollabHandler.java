@@ -35,7 +35,7 @@ public class CollabHandler extends TextWebSocketHandler {
   protected void handleTextMessage(WebSocketSession session, TextMessage message)
       throws IOException {
     try {
-      dispatch(roomOf(session), session.getId(), codec.decode(message.getPayload()));
+      dispatch(session, codec.decode(message.getPayload()));
     } catch (ProtocolException exception) {
       session.close(CloseStatus.BAD_DATA.withReason(exception.getMessage()));
     }
@@ -46,11 +46,13 @@ public class CollabHandler extends TextWebSocketHandler {
     rooms.leave(docIdOf(session), session.getId());
   }
 
-  private static void dispatch(DocRoom room, String sessionId, ClientMessage message) {
+  private void dispatch(WebSocketSession session, ClientMessage message) {
+    DocRoom room = roomOf(session);
     switch (message) {
-      case Hello hello -> room.hello(sessionId, hello.lastSeq());
-      case Submit submit -> room.submit(sessionId, submit.op());
-      case Presence presence -> room.relayPresence(sessionId, presence.payload());
+      case Hello hello -> room.hello(session.getId(), hello.lastSeq());
+      case Submit submit -> room.submit(session.getId(), submit.op());
+      case Presence presence -> room.relayPresence(
+          session.getId(), codec.presence(presence.message(), SessionUser.of(session)));
     }
   }
 

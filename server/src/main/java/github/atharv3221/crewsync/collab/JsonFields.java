@@ -24,6 +24,17 @@ final class JsonFields {
     return value.stringValue();
   }
 
+  /** Like {@link #requireString} but whitespace counts: a typed "\n" or " " is a valid value. */
+  static String requireNonEmptyString(JsonNode parent, String field, int maxLength) {
+    JsonNode value = parent.path(field);
+    if (!value.isString() || value.stringValue().isEmpty()
+        || value.stringValue().length() > maxLength) {
+      throw new ProtocolException(
+          "'" + field + "' must be a non-empty string of at most " + maxLength + " characters");
+    }
+    return value.stringValue();
+  }
+
   static long requireNonNegativeLong(JsonNode parent, String field) {
     JsonNode value = parent.path(field);
     if (!value.isIntegralNumber() || !value.canConvertToLong() || value.longValue() < 0) {

@@ -51,6 +51,10 @@ public class DocMember {
     this.addedAt = Instant.now();
   }
 
+  public boolean isOwner() {
+    return role == DocRole.OWNER;
+  }
+
   private static Document requirePersisted(Document document) {
     if (document.getId() == null) {
       throw new IllegalArgumentException("Document must be saved before adding members");

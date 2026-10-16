@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Rga, type Op } from "./index";
+import { opKey, Rga, type Op } from "./index";
 
 /** Seeded random generator, so a failing chaos run can be replayed exactly. */
 function seededRandom(seed: number): () => number {
@@ -39,6 +39,33 @@ describe("Rga basics", () => {
     const b = new Rga("B");
     deliver(b, typeText(a, 0, "hello"));
     expect(b.text()).toBe("hello");
+  });
+
+  it("produces flat ops: the op's own counter/site next to kind", () => {
+    const doc = new Rga("A");
+    const insert = doc.localInsert(0, "x");
+    expect(insert).toEqual({
+      kind: "insert",
+      counter: 1,
+      site: "A",
+      origin: null,
+      value: "x",
+    });
+    expect(opKey(insert)).toBe("insert:1@A");
+  });
+
+  it("gives a delete its own id and ticks the clock", () => {
+    const doc = new Rga("A");
+    doc.localInsert(0, "x");
+    const del = doc.localDelete(0);
+    expect(del).toEqual({
+      kind: "delete",
+      counter: 2,
+      site: "A",
+      target: { counter: 1, site: "A" },
+    });
+    expect(opKey(del)).toBe("delete:2@A");
+    expect(doc.localInsert(0, "y").counter).toBe(3);
   });
 
   it("rejects anything that's not one UTF-16 code unit", () => {
@@ -97,17 +124,41 @@ describe("Rga convergence properties", () => {
     expect(b.pendingCount).toBe(0);
   });
 
-  it("buffers a delete that arrives before its insert", () => {
+  it("a delete waits for its target (causality)", () => {
     const a = new Rga("A");
     const b = new Rga("B");
+    const c = new Rga("C");
     const insert = a.localInsert(0, "x");
-    const del = a.localDelete(0);
-
-    b.apply(del);
-    expect(b.pendingCount).toBe(1);
     b.apply(insert);
-    expect(b.text()).toBe("");
-    expect(b.pendingCount).toBe(0);
+    const del = b.localDelete(0);
+
+    c.apply(del);
+    expect(c.pendingCount).toBe(1);
+    c.apply(insert);
+    expect(c.text()).toBe("");
+    expect(c.pendingCount).toBe(0);
+    // the applied delete advanced C's Lamport clock past it
+    expect(c.localInsert(0, "y").counter).toBeGreaterThan(del.counter);
+  });
+
+  it("converges when two sites delete the same character concurrently", () => {
+    const a = new Rga("A");
+    const b = new Rga("B");
+    const c = new Rga("C");
+    const ops = typeText(a, 0, "xy");
+    deliver(b, ops);
+
+    const fromA = a.localDelete(0);
+    const fromB = b.localDelete(0);
+    expect(opKey(fromA)).not.toBe(opKey(fromB));
+    a.apply(fromB);
+    b.apply(fromA);
+    deliver(c, [fromB, fromA, ...ops]);
+
+    for (const doc of [a, b, c]) {
+      expect(doc.text()).toBe("y");
+      expect(doc.pendingCount).toBe(0);
+    }
   });
 
   it("can insert after a character someone else deleted (tombstones)", () => {

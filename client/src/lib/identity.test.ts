@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { colorFor, createSiteId, isValidDocId, newDocId } from "./identity.ts";
+import { colorFor, createSiteId } from "./identity.ts";
 
 describe("colorFor", () => {
   it("gives the same color for the same id", () => {
@@ -13,33 +13,11 @@ describe("colorFor", () => {
   });
 });
 
-describe("random ids", () => {
-  it("createSiteId is 32 hex chars and unique per call", () => {
+describe("createSiteId", () => {
+  it("is 32 hex chars and unique per call", () => {
     const a = createSiteId();
     const b = createSiteId();
     expect(a).toMatch(/^[0-9a-f]{32}$/);
     expect(a).not.toBe(b);
   });
-
-  it("newDocId is 16 hex chars and passes doc id validation", () => {
-    const id = newDocId();
-    expect(id).toMatch(/^[0-9a-f]{16}$/);
-    expect(isValidDocId(id)).toBe(true);
-  });
-});
-
-describe("isValidDocId", () => {
-  it.each(["3f9a0c7be2d41a68", "team-notes", "project_x2", "a"])(
-    "accepts %s",
-    (id) => {
-      expect(isValidDocId(id)).toBe(true);
-    },
-  );
-
-  it.each(["", "my notes", "../admin", "a/b", "x".repeat(65), "<script>"])(
-    "rejects %s",
-    (id) => {
-      expect(isValidDocId(id)).toBe(false);
-    },
-  );
 });

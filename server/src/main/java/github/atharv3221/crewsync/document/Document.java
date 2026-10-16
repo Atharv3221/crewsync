@@ -35,6 +35,11 @@ public class Document {
   @Column(nullable = false, length = MAX_TITLE_LENGTH)
   private String title;
 
+  /** Bumped on every rename, so clients can ignore a title that arrives after a newer one. */
+  @Column(name = "title_version", nullable = false,
+      columnDefinition = "bigint default 0 not null")
+  private long titleVersion;
+
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "created_by", nullable = false, updatable = false)
   private User createdBy;
@@ -52,6 +57,11 @@ public class Document {
     this.title = cleanTitle(title);
     this.createdBy = Objects.requireNonNull(createdBy, "createdBy");
     this.createdAt = Instant.now();
+  }
+
+  public void rename(String newTitle) {
+    this.title = cleanTitle(newTitle);
+    this.titleVersion++;
   }
 
   private static String cleanTitle(String raw) {

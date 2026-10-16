@@ -6,13 +6,12 @@ import type { CharId, Op } from "../crdt";
  */
 export interface HelloMessage {
   readonly type: "hello";
-  readonly site: string;
   readonly lastSeq: number;
 }
 
 /**
- * A local edit. The server assigns it a seq and
- * broadcasts it.
+ * A local edit. The server assigns it a seq and broadcasts it. A duplicate
+ * (same op_key) is answered to the sender alone with its original seq.
  */
 export interface OpOutMessage {
   readonly type: "op";
@@ -29,14 +28,20 @@ export interface PresenceMessage {
 
 export type ClientMessage = HelloMessage | OpOutMessage | PresenceMessage;
 
+/** An op together with the seq the server stored it under. */
+export interface SequencedOp {
+  readonly seq: number;
+  readonly op: Op;
+}
+
 /**
  * Reply to {@linkcode HelloMessage}, all ops after the client's
- * last sequence.
+ * last sequence. `seq` is the server's latest seq.
  */
 export interface InitMessage {
   readonly type: "init";
   readonly seq: number;
-  readonly ops: readonly Op[];
+  readonly ops: readonly SequencedOp[];
 }
 
 export interface OpInMessage {
@@ -45,7 +50,29 @@ export interface OpInMessage {
   readonly op: Op;
 }
 
-export type ServerMessage = InitMessage | OpInMessage | PresenceMessage;
+/** Every tab of `userId` is gone, e.g. because the owner removed them: drop their presence. */
+export interface LeaveMessage {
+  readonly type: "leave";
+  readonly userId: string;
+}
+
+/** The doc was renamed (by anyone, including this user). */
+export interface TitleMessage {
+  readonly type: "title";
+  readonly title: string;
+  readonly version: number;
+}
+
+export type ServerMessage =
+  InitMessage | OpInMessage | PresenceMessage | LeaveMessage | TitleMessage;
+
+const SERVER_TYPES: ReadonlySet<unknown> = new Set([
+  "init",
+  "op",
+  "presence",
+  "leave",
+  "title",
+]);
 
 /**
  * Parses raw WebSocket text into a {@linkcode ServerMessage},
@@ -59,7 +86,7 @@ export function parseServerMessage(raw: string): ServerMessage | null {
       typeof data === "object" &&
       data !== null &&
       "type" in data &&
-      (data.type === "init" || data.type === "op" || data.type === "presence")
+      SERVER_TYPES.has(data.type)
     ) {
       result = data as ServerMessage;
     }

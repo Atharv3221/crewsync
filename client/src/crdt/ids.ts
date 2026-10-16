@@ -31,12 +31,12 @@ export function idKey(id: CharId): string {
   return `${id.counter}:${id.site}`;
 }
 
-/** Unique key per operation, used to detect duplicate ops. */
+/** The op's own id: for an insert, also the id of the character it creates. */
+export function opId(op: Op): CharId {
+  return { counter: op.counter, site: op.site };
+}
+
+/** Unique key per operation, in the server's op_key format: `kind:counter@site`. */
 export function opKey(op: Op): string {
-  switch (op.kind) {
-    case "insert":
-      return `insert:${idKey(op.id)}`;
-    case "delete":
-      return `delete:${idKey(op.target)}`;
-  }
+  return `${op.kind}:${op.counter}@${op.site}`;
 }

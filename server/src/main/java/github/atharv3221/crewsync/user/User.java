@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.AccessLevel;
@@ -20,7 +21,9 @@ import lombok.NoArgsConstructor;
 public class User {
 
   static final int MAX_NAME_LENGTH = 100;
+  static final int MAX_EMAIL_LENGTH = 254;
   private static final Pattern WHITESPACE_RUN = Pattern.compile("\\s+");
+  private static final Pattern EMAIL_FORMAT = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -29,18 +32,25 @@ public class User {
   @Column(nullable = false, length = MAX_NAME_LENGTH)
   private String name;
 
-  @Column(unique = true)
+  @Column(nullable = false, unique = true, length = MAX_EMAIL_LENGTH)
   private String email;
 
-  @Column(name = "password_hash")
+  @Column(name = "password_hash", nullable = false)
   private String passwordHash;
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
-  public User(String name) {
+  public User(String name, String email, String passwordHash) {
     this.name = cleanName(name);
+    this.email = cleanEmail(email);
+    this.passwordHash = requirePasswordHash(passwordHash);
     this.createdAt = Instant.now();
+  }
+
+  /** The form emails are stored in, so lookups match regardless of case or surrounding spaces. */
+  public static String normalizeEmail(String raw) {
+    return raw == null ? "" : raw.strip().toLowerCase(Locale.ROOT);
   }
 
   public void rename(String newName) {
@@ -56,6 +66,21 @@ public class User {
       throw new IllegalArgumentException("Name must be at most " + MAX_NAME_LENGTH + " characters");
     }
     return cleaned;
+  }
+
+  private static String cleanEmail(String raw) {
+    String normalized = normalizeEmail(raw);
+    if (normalized.length() > MAX_EMAIL_LENGTH || !EMAIL_FORMAT.matcher(normalized).matches()) {
+      throw new IllegalArgumentException("Enter a valid email address");
+    }
+    return normalized;
+  }
+
+  private static String requirePasswordHash(String passwordHash) {
+    if (passwordHash == null || passwordHash.isBlank()) {
+      throw new IllegalArgumentException("Password hash is required");
+    }
+    return passwordHash;
   }
 
   @Override

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CollabClient, type CollabSnapshot } from "./CollabClient";
 
 /** Stable event handlers to spread onto the collaborative textarea. */
@@ -12,9 +12,14 @@ export interface CollabHandlers {
 /** Initial default snapshot representing a connecting collaboration state. */
 const INITIAL: CollabSnapshot = {
   status: "connecting",
+  accessLost: null,
   peers: [],
+  cursors: [],
   unsynced: 0,
   length: 0,
+  text: "",
+  title: null,
+  titleVersion: -1,
 };
 
 /**
@@ -23,10 +28,16 @@ const INITIAL: CollabSnapshot = {
  *
  * @param docId - The unique identifier of the document being edited.
  * @param userId - The unique identifier of the current user.
- * @param name - The display name of the current user.
+ * @param name - The display name of the current user. Changes are sent as presence; they never reconnect.
+ * @param token - The session token for the WebSocket handshake.
  * @returns An object containing the `textareaRef`, memoized event `handlers` for the textarea, and the live `snapshot` fields.
  */
-export function useCollab(docId: string, userId: string, name: string) {
+export function useCollab(
+  docId: string,
+  userId: string,
+  name: string,
+  token: string,
+) {
   const [snapshot, setSnapshot] = useState<CollabSnapshot>(INITIAL);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const clientRef = useRef<CollabClient | null>(null);
@@ -38,12 +49,14 @@ export function useCollab(docId: string, userId: string, name: string) {
     clientRef.current?.setName(name);
   }, [name]);
 
-  // One client per document; torn down when the doc changes or the page closes.
+  // One client per document and session. Only primitives in the deps: an object, callback or the
+  // name here would tear the socket down on every re-render.
   useEffect(() => {
     const client = new CollabClient({
       docId,
       userId,
       name: nameRef.current,
+      token,
       onChange: setSnapshot,
     });
     clientRef.current = client;
@@ -53,7 +66,7 @@ export function useCollab(docId: string, userId: string, name: string) {
       client.dispose();
       clientRef.current = null;
     };
-  }, [docId, userId]);
+  }, [docId, userId, token]);
 
   // Stable handlers for the textarea.
   const handlers = useMemo<CollabHandlers>(
@@ -66,5 +79,11 @@ export function useCollab(docId: string, userId: string, name: string) {
     [],
   );
 
-  return { textareaRef, handlers, ...snapshot };
+  const setTitle = useCallback(
+    (title: string, version: number) =>
+      clientRef.current?.setTitle(title, version),
+    [],
+  );
+
+  return { textareaRef, handlers, setTitle, ...snapshot };
 }

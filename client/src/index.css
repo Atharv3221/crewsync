@@ -58,8 +58,42 @@ textarea {
     color: inherit;
 }
 
+/* 16px keeps iOS Safari from zooming into focused fields */
+input {
+    font-size: 16px;
+}
+
+a {
+    color: inherit;
+}
+
 ::selection {
     background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* ---------- brand ---------- */
+.logo {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 17px;
+    letter-spacing: -0.02em;
+}
+
+.logo::before {
+    content: "C";
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: 15px;
+    font-weight: 700;
+    transform: rotate(-6deg);
 }
 
 /* ---------- page layout ---------- */
@@ -67,4 +101,75 @@ textarea {
     display: flex;
     flex-direction: column;
     height: 100dvh;
+}
+
+/* ---------- forms ---------- */
+.field-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.text-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.text-input:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.text-input[aria-invalid="true"] {
+    border-color: var(--offline);
+}
+
+.field-error {
+    margin: 0;
+    color: var(--offline);
+    font-size: 12px;
+}
+
+.button {
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.button:hover:not(:disabled) {
+    border-color: var(--text);
+}
+
+.button:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.button-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+}
+
+.button-primary:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 88%, #000);
 }

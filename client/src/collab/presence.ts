@@ -11,6 +11,15 @@ export interface Peer {
   readonly line: number;
 }
 
+/** Where one peer tab's caret is, as an offset into the current text. */
+export interface RemoteCursor {
+  readonly site: string;
+  readonly userId: string;
+  readonly name: string;
+  readonly color: string;
+  readonly pos: number;
+}
+
 /** One open tab of a peer, as last reported. */
 interface PeerTab {
   readonly userId: string;
@@ -46,6 +55,22 @@ export class PresenceTracker {
         lastSeen: now,
       });
     }
+  }
+
+  /**
+   * Drops every tab of `userId` at once, e.g. when they lost access to the document.
+   *
+   * @returns True if any tabs were removed, false otherwise.
+   */
+  removeUser(userId: string): boolean {
+    let removed = false;
+    for (const [site, tab] of this.tabs) {
+      if (tab.userId === userId) {
+        this.tabs.delete(site);
+        removed = true;
+      }
+    }
+    return removed;
   }
 
   /**
@@ -93,5 +118,21 @@ export class PresenceTracker {
       tabs: p.tabs,
       line: p.line,
     }));
+  }
+
+  /**
+   * One caret per peer tab, resolved against the current text so they follow concurrent edits.
+   *
+   * @param doc - The RGA document used to resolve cursor positions.
+   * @returns Carets ordered by position.
+   */
+  cursors(doc: Rga): RemoteCursor[] {
+    return Array.from(this.tabs, ([site, tab]) => ({
+      site,
+      userId: tab.userId,
+      name: tab.name,
+      color: colorFor(tab.userId),
+      pos: doc.posOf(tab.cursor),
+    })).sort((a, b) => a.pos - b.pos);
   }
 }

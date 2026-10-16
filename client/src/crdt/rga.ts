@@ -1,5 +1,5 @@
 import type { CharId, DeleteOp, InsertOp, Op } from "./types";
-import { compareIds, idKey, sameId } from "./ids";
+import { compareIds, idKey, opId, sameId } from "./ids";
 
 /** One character in the document, including deleted ones (tombstones). */
 interface Node {
@@ -26,7 +26,8 @@ export class Rga {
     this.clock += 1;
     const op: InsertOp = {
       kind: "insert",
-      id: { counter: this.clock, site: this.site },
+      counter: this.clock,
+      site: this.site,
       origin: this.idAt(pos),
       value,
     };
@@ -35,9 +36,13 @@ export class Rga {
   }
 
   localDelete(pos: number): DeleteOp {
+    const target = this.visibleNode(pos).id;
+    this.clock += 1;
     const op: DeleteOp = {
       kind: "delete",
-      target: this.visibleNode(pos).id,
+      counter: this.clock,
+      site: this.site,
+      target,
     };
     this.apply(op);
     return op;
@@ -65,20 +70,21 @@ export class Rga {
   }
 
   private integrateInsert(op: InsertOp): boolean {
-    const key = idKey(op.id);
+    const id = opId(op);
+    const key = idKey(id);
     let applied = this.index.has(key);
     if (!applied) {
       let slot = this.slotAfter(op.origin);
       if (slot >= 0) {
-        this.clock = Math.max(this.clock, op.id.counter);
+        this.clock = Math.max(this.clock, op.counter);
         while (
           slot < this.nodes.length &&
-          compareIds(this.nodes[slot].id, op.id) > 0
+          compareIds(this.nodes[slot].id, id) > 0
         ) {
           slot++;
         }
         const node: Node = {
-          id: op.id,
+          id,
           value: op.value,
           deleted: false,
         };
@@ -90,9 +96,11 @@ export class Rga {
     return applied;
   }
 
+  /** Waits (returns false) until the target arrives; deleting a tombstone again is a no-op. */
   private integrateDelete(op: DeleteOp): boolean {
     const node = this.index.get(idKey(op.target));
     if (node !== undefined) {
+      this.clock = Math.max(this.clock, op.counter);
       node.deleted = true;
     }
     return node !== undefined;

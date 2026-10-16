@@ -49,6 +49,34 @@ describe("SyncTracker", () => {
     expect(sync.pending()).toEqual([mine[1]]);
   });
 
+  it("matches the echo of a delete by the delete's own id", () => {
+    const sync = new SyncTracker();
+    const doc = new Rga("A");
+    const insert = doc.localInsert(0, "x");
+    const del = doc.localDelete(0);
+    sync.track(insert);
+    sync.track(del);
+
+    sync.confirm([insert]);
+    expect(sync.pending()).toEqual([del]);
+    sync.confirm([del]);
+    expect(sync.unsynced).toBe(0);
+  });
+
+  it("keeps two sites' deletes of the same character apart", () => {
+    const a = new Rga("A");
+    const b = new Rga("B");
+    const insert = a.localInsert(0, "x");
+    b.apply(insert);
+    const mine = a.localDelete(0);
+    const theirs = b.localDelete(0);
+
+    const sync = new SyncTracker();
+    sync.track(mine);
+    sync.confirm([theirs]);
+    expect(sync.pending()).toEqual([mine]);
+  });
+
   it("detects gaps in the server sequence", () => {
     const sync = new SyncTracker();
     expect(sync.hasGapBefore(1)).toBe(false);

@@ -8,10 +8,12 @@ import github.atharv3221.crewsync.collab.ClientMessage.Hello;
 import github.atharv3221.crewsync.collab.ClientMessage.Presence;
 import github.atharv3221.crewsync.collab.ClientMessage.Submit;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 class MessageCodecTest {
 
@@ -42,6 +44,22 @@ class MessageCodecTest {
     assertThat(submit.op().key()).isEqualTo("insert:1@s1");
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"\\n", " ", "\\t", "\\r"})
+  void acceptsWhitespaceInsertValues(String escapedValue) {
+    Submit submit = (Submit) codec.decode("{\"type\":\"op\",\"op\":{\"kind\":\"insert\","
+        + "\"counter\":1,\"site\":\"s1\",\"value\":\"" + escapedValue + "\",\"origin\":null}}");
+
+    assertThat(submit.op().body().get("value").stringValue()).isNotEmpty().isBlank();
+  }
+
+  @Test
+  void rejectsEmptyInsertValue() {
+    assertThatThrownBy(() -> codec.decode("{\"type\":\"op\",\"op\":{\"kind\":\"insert\","
+        + "\"counter\":1,\"site\":\"s1\",\"value\":\"\",\"origin\":null}}"))
+        .isInstanceOf(ProtocolException.class);
+  }
+
   @Test
   void buildsDeleteKey() {
     Submit submit = (Submit) codec.decode("{\"type\":\"op\",\"op\":{\"kind\":\"delete\","
@@ -51,10 +69,35 @@ class MessageCodecTest {
   }
 
   @Test
-  void keepsPresencePayloadVerbatim() {
+  void keepsPresenceMessage() {
     String payload = "{\"type\":\"presence\",\"site\":\"s1\",\"cursor\":{\"counter\":1}}";
 
-    assertThat(codec.decode(payload)).isEqualTo(new Presence(payload));
+    assertThat(codec.decode(payload)).isEqualTo(new Presence((ObjectNode) JSON.readTree(payload)));
+  }
+
+  @Test
+  void presenceIdentityIsOverwrittenWithTheSessionUser() {
+    UUID realId = UUID.randomUUID();
+    Presence presence = (Presence) codec.decode("{\"type\":\"presence\",\"site\":\"s1\","
+        + "\"userId\":\"someone-else\",\"name\":\"Mallory\",\"cursor\":null}");
+
+    JsonNode relayed = JSON.readTree(
+        codec.presence(presence.message(), new SessionUser(realId, "Ada")).getPayload());
+
+    assertThat(relayed.get("userId").stringValue()).isEqualTo(realId.toString());
+    assertThat(relayed.get("name").stringValue()).isEqualTo("Ada");
+    assertThat(relayed.get("site").stringValue()).isEqualTo("s1");
+    assertThat(relayed.get("cursor").isNull()).isTrue();
+  }
+
+  @Test
+  void presenceIdentityIsAddedWhenMissing() {
+    Presence presence = (Presence) codec.decode("{\"type\":\"presence\",\"site\":\"s1\"}");
+
+    JsonNode relayed = JSON.readTree(codec.presence(
+        presence.message(), new SessionUser(UUID.randomUUID(), "Ada")).getPayload());
+
+    assertThat(relayed.get("name").stringValue()).isEqualTo("Ada");
   }
 
   @ParameterizedTest
@@ -95,8 +138,18 @@ class MessageCodecTest {
   }
 
   @Test
+  void encodesTitleChange() {
+    JsonNode message = JSON.readTree(codec.title("Q4 \"plan\"", 3).getPayload());
+
+    assertThat(message.get("type").stringValue()).isEqualTo("title");
+    assertThat(message.get("title").stringValue()).isEqualTo("Q4 \"plan\"");
+    assertThat(message.get("version").longValue()).isEqualTo(3);
+  }
+
+  @Test
   void encodesOpBroadcast() {
-    JsonNode message = JSON.readTree(codec.op(5, TestSessions.insert(1, "s1")).getPayload());
+    JsonNode message = JSON.readTree(codec.op(
+        new SequencedOp(5, TestSessions.insert(1, "s1").json())).getPayload());
 
     assertThat(message.get("type").stringValue()).isEqualTo("op");
     assertThat(message.get("seq").longValue()).isEqualTo(5);

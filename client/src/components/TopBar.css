@@ -15,41 +15,38 @@
     min-width: 0;
 }
 
-/* logo */
-.logo {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 700;
-    font-size: 17px;
-    letter-spacing: -0.02em;
-}
-
-.logo::before {
-    content: "C";
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    background: var(--accent);
-    color: var(--accent-text);
-    font-size: 15px;
-    font-weight: 700;
-    transform: rotate(-6deg);
-}
-
-.doc-id {
+.doc-title {
+    min-width: 0;
+    width: 22ch;
     padding: 3px 10px;
     border-radius: 999px;
     background: var(--surface);
     border: 1px solid var(--border);
-    color: var(--muted);
+    color: var(--text);
     font-family: var(--font-text);
-    font-size: 12px;
-    overflow: hidden;
+    font-size: 13px;
     text-overflow: ellipsis;
+    outline: none;
+}
+
+.doc-title:hover,
+.doc-title:focus {
+    border-color: var(--muted);
+}
+
+.doc-title-readonly {
+    overflow: hidden;
     white-space: nowrap;
+    color: var(--muted);
+    cursor: default;
+}
+
+.doc-title-readonly:hover {
+    border-color: var(--border);
+}
+
+.doc-title-error {
+    border-color: var(--offline);
 }
 
 /* peers */
@@ -128,28 +125,12 @@
     }
 }
 
-/* name input */
-.name-input {
-    width: 140px;
-    padding: 7px 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.name-input:hover {
-    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-}
-
-.name-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+.share {
+    position: relative;
 }
 
 /* buttons */
-.topbar button {
+:where(.topbar) button {
     padding: 7px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -160,21 +141,21 @@
     transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
 }
 
-.topbar button:hover {
+:where(.topbar) button:hover {
     border-color: var(--text);
 }
 
-.topbar button:active {
+:where(.topbar) button:active {
     transform: translateY(1px);
 }
 
-.topbar button.primary {
+:where(.topbar) button.primary {
     background: var(--accent);
     border-color: var(--accent);
     color: var(--accent-text);
 }
 
-.topbar button.primary:hover {
+:where(.topbar) button.primary:hover {
     background: color-mix(in srgb, var(--accent) 88%, #000);
 }
 
@@ -195,11 +176,7 @@
         font-size: 0;
     }
 
-    .name-input {
-        width: 96px;
-    }
-
-    .topbar button {
+    :where(.topbar) button {
         padding: 7px 10px;
     }
 }
