@@ -64,7 +64,7 @@ export function HomePage({
     <div className="home">
       <header className="topbar">
         <div className="topbar-left">
-          <span className="logo">Crewrite</span>
+          <span className="logo">CrewSync</span>
         </div>
         <div className="topbar-right">
           <UserMenu user={user} onRename={onRename} onLogout={onLogout} />

@@ -1,3 +1,4 @@
+import { socketBase } from "../lib/endpoints";
 import {
   parseServerMessage,
   type ClientMessage,
@@ -27,9 +28,8 @@ const MAX_DELAY_MS = 10_000;
 
 /** Browsers can't set headers on a WebSocket, so the token travels in the query string. */
 export function socketUrl(docId: string, token: string): string {
-  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const query = `token=${encodeURIComponent(token)}`;
-  return `${protocol}//${location.host}/ws/${encodeURIComponent(docId)}?${query}`;
+  return `${socketBase()}/ws/${encodeURIComponent(docId)}?${query}`;
 }
 
 /**

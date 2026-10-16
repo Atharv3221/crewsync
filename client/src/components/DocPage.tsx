@@ -117,7 +117,7 @@ function OpenDoc({
 
   useEffect(() => {
     const previous = document.title;
-    document.title = `${title} · Crewrite`;
+    document.title = `${title} · CrewSync`;
     return () => {
       document.title = previous;
     };

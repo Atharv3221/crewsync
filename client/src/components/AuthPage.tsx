@@ -21,7 +21,7 @@ const COPY: Record<
   { title: string; submit: string; switchPrompt: string; switchLink: string }
 > = {
   login: {
-    title: "Log in to Crewrite",
+    title: "Log in to CrewSync",
     submit: "Log in",
     switchPrompt: "New here?",
     switchLink: "Create an account",
@@ -115,7 +115,7 @@ export function AuthPage({ mode, next, onAuthenticated }: AuthPageProps) {
         noValidate
         onSubmit={(event) => void submit(event)}
       >
-        <span className="logo">Crewrite</span>
+        <span className="logo">CrewSync</span>
         <h1 className="auth-title">{copy.title}</h1>
 
         {mode === "signup" && (

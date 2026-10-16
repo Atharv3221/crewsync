@@ -86,3 +86,7 @@ build/
 
 ### VS Code ###
 server/.vscode/
+
+# Benchmarks: downloaded traces and build output
+bench/traces/
+client/bench/.build/

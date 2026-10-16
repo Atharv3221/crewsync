@@ -10,10 +10,17 @@ public interface OpLog {
   List<SequencedOp> opsAfter(UUID docId, long seq);
 
   /**
-   * Stores {@code op} under {@code seq} unless an op with the same key was already stored.
+   * Stores {@code ops} in one transaction. New ops get consecutive seqs starting at
+   * {@code firstSeq}, in list order; an op whose key is already stored, or appears earlier in the
+   * list, is not stored again and uses no seq.
    *
-   * @return the op as stored: the new one under {@code seq}, or the earlier one with its
-   *     original seq when {@code op} is a duplicate
+   * @return one entry per input op, in input order: the op as stored, so a duplicate comes back
+   *     with its original seq
    */
-  SequencedOp append(UUID docId, long seq, ClientOp op);
+  List<SequencedOp> appendAll(UUID docId, long firstSeq, List<ClientOp> ops);
+
+  /** {@link #appendAll} for a single op. */
+  default SequencedOp append(UUID docId, long seq, ClientOp op) {
+    return appendAll(docId, seq, List.of(op)).getFirst();
+  }
 }

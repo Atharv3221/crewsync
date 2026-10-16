@@ -19,7 +19,6 @@ class DocRoomTest {
 
   private final UUID docId = UUID.randomUUID();
   private final InMemoryOpLog opLog = new InMemoryOpLog();
-  private final MessageCodec codec = new MessageCodec(JSON);
   private final WebSocketSession alice = openSession("alice");
   private final WebSocketSession bob = openSession("bob");
 
@@ -101,7 +100,7 @@ class DocRoomTest {
     opLog.append(docId, 1, insert(1, "a"));
     opLog.append(docId, 2, insert(2, "a"));
     opLog.append(docId, 3, insert(3, "a"));
-    DocRoom room = new DocRoom(docId, opLog, codec);
+    DocRoom room = TestSessions.room(docId, opLog);
     room.attach(alice);
 
     room.hello("alice", 1);
@@ -115,7 +114,7 @@ class DocRoomTest {
 
   @Test
   void sessionsReceiveNothingBeforeHello() {
-    DocRoom room = new DocRoom(docId, opLog, codec);
+    DocRoom room = TestSessions.room(docId, opLog);
     room.attach(alice);
     room.attach(bob);
     room.hello("alice", 0);
@@ -127,7 +126,7 @@ class DocRoomTest {
 
   @Test
   void rejectsOpsAndPresenceBeforeHello() {
-    DocRoom room = new DocRoom(docId, opLog, codec);
+    DocRoom room = TestSessions.room(docId, opLog);
     room.attach(alice);
 
     assertThatThrownBy(() -> room.submit("alice", insert(1, "a")))
@@ -174,7 +173,7 @@ class DocRoomTest {
     WebSocketSession keeper = openSession("keeper", UUID.randomUUID());
     WebSocketSession tab1 = openSession("tab1", removedId);
     WebSocketSession tab2 = openSession("tab2", removedId);
-    DocRoom room = new DocRoom(docId, opLog, codec);
+    DocRoom room = TestSessions.room(docId, opLog);
     for (WebSocketSession session : List.of(keeper, tab1, tab2)) {
       room.attach(session);
       room.hello(session.getId(), 0);
@@ -198,7 +197,7 @@ class DocRoomTest {
   @Test
   void evictingAUserWithoutSessionsChangesNothing() {
     WebSocketSession keeper = openSession("keeper", UUID.randomUUID());
-    DocRoom room = new DocRoom(docId, opLog, codec);
+    DocRoom room = TestSessions.room(docId, opLog);
     room.attach(keeper);
     room.hello("keeper", 0);
 
@@ -207,7 +206,7 @@ class DocRoomTest {
   }
 
   private DocRoom joinedRoom() {
-    DocRoom room = new DocRoom(docId, opLog, codec);
+    DocRoom room = TestSessions.room(docId, opLog);
     room.attach(alice);
     room.attach(bob);
     room.hello("alice", 0);

@@ -15,7 +15,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
   private final CollabHandler collabHandler;
   private final DocHandshakeInterceptor docHandshakeInterceptor;
 
-  @Value("${crewrite.ws.allowed-origin-patterns}")
+  @Value("${crewsync.allowed-origin-patterns}")
   private String[] allowedOriginPatterns;
 
   @Override

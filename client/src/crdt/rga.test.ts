@@ -268,3 +268,66 @@ describe("Rga chaos", () => {
     }
   });
 });
+
+describe("Rga large documents (many internal chunks)", () => {
+  it("matches a plain string under thousands of random local edits", () => {
+    const random = seededRandom(7);
+    const randomInt = (n: number) => Math.floor(random() * n);
+    const doc = new Rga("A");
+    let model = "";
+    for (let step = 0; step < 20_000; step++) {
+      if (model.length === 0 || random() < 0.7) {
+        const pos = randomInt(model.length + 1);
+        const ch = "ab\n"[randomInt(3)];
+        doc.localInsert(pos, ch);
+        model = model.slice(0, pos) + ch + model.slice(pos);
+      } else {
+        const pos = randomInt(model.length);
+        doc.localDelete(pos);
+        model = model.slice(0, pos) + model.slice(pos + 1);
+      }
+    }
+    expect(model.length).toBeGreaterThan(5_000);
+    expect(doc.text()).toBe(model);
+    expect(doc.length).toBe(model.length);
+    for (let pos = 0; pos <= model.length; pos += 97) {
+      expect(doc.posOf(doc.idAt(pos))).toBe(pos);
+    }
+  });
+
+  it("replicas of a large document converge under shuffled delivery", () => {
+    const random = seededRandom(11);
+    const randomInt = (n: number) => Math.floor(random() * n);
+    const docs = ["A", "B", "C"].map((site) => new Rga(site));
+    const inboxes: Op[][] = docs.map(() => []);
+    for (let step = 0; step < 9_000; step++) {
+      const r = randomInt(docs.length);
+      const doc = docs[r];
+      const op =
+        doc.length === 0 || random() < 0.75
+          ? doc.localInsert(randomInt(doc.length + 1), "xyz"[randomInt(3)])
+          : doc.localDelete(randomInt(doc.length));
+      inboxes.forEach((inbox, other) => {
+        if (other !== r) inbox.push(op);
+      });
+      if (randomInt(50) === 0) {
+        // occasionally deliver a shuffled backlog
+        inboxes.forEach((inbox, i) => {
+          while (inbox.length > 0) {
+            docs[i].apply(inbox.splice(randomInt(inbox.length), 1)[0]);
+          }
+        });
+      }
+    }
+    inboxes.forEach((inbox, i) => {
+      while (inbox.length > 0) {
+        docs[i].apply(inbox.splice(randomInt(inbox.length), 1)[0]);
+      }
+    });
+    expect(docs[0].length).toBeGreaterThan(2_000);
+    for (const doc of docs) {
+      expect(doc.text()).toBe(docs[0].text());
+      expect(doc.pendingCount).toBe(0);
+    }
+  });
+});

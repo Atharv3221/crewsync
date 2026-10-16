@@ -1,7 +1,11 @@
 package github.atharv3221.crewsync.collab;
 
+import github.atharv3221.crewsync.document.Document;
 import github.atharv3221.crewsync.document.DocumentRepository;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,12 +32,28 @@ public class JpaOpLog implements OpLog {
         .toList();
   }
 
+  /** One select for the batch's keys, then the new ops, all committed together. */
   @Override
   @Transactional
-  public SequencedOp append(UUID docId, long seq, ClientOp op) {
-    Op stored = opRepository.findByDocumentIdAndOpKey(docId, op.key())
-        .orElseGet(() -> opRepository.save(
-            new Op(documentRepository.getReferenceById(docId), seq, op.key(), op.json())));
-    return new SequencedOp(stored.getSeq(), stored.getOpJson());
+  public List<SequencedOp> appendAll(UUID docId, long firstSeq, List<ClientOp> ops) {
+    Map<String, SequencedOp> byKey = new HashMap<>();
+    opRepository.findAllByDocumentIdAndOpKeyIn(docId, ops.stream().map(ClientOp::key).toList())
+        .forEach(op -> byKey.put(op.getOpKey(), new SequencedOp(op.getSeq(), op.getOpJson())));
+    Document document = documentRepository.getReferenceById(docId);
+    List<Op> fresh = new ArrayList<>();
+    List<SequencedOp> stored = new ArrayList<>(ops.size());
+    long seq = firstSeq;
+    for (ClientOp op : ops) {
+      SequencedOp existing = byKey.get(op.key());
+      if (existing == null) {
+        existing = new SequencedOp(seq, op.json());
+        fresh.add(new Op(document, seq, op.key(), op.json()));
+        byKey.put(op.key(), existing);
+        seq++;
+      }
+      stored.add(existing);
+    }
+    opRepository.saveAll(fresh);
+    return stored;
   }
 }

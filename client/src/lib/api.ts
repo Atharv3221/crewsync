@@ -1,4 +1,5 @@
 import { clearToken, getToken } from "./auth";
+import { apiUrl } from "./endpoints";
 import { currentRoute, loginRoute, navigate } from "./routes";
 
 export interface User {
@@ -86,7 +87,7 @@ async function request<T>(
   body?: unknown,
 ): Promise<T> {
   const token = getToken();
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method,
     headers: headersFor(token, body !== undefined),
     body: body === undefined ? undefined : JSON.stringify(body),

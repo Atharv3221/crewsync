@@ -55,7 +55,7 @@ export function TopBar({
     <header className="topbar">
       <div className="topbar-left">
         <a className="logo" href={routeHash({ page: "home" })} title="My docs">
-          Crewrite
+          CrewSync
         </a>
         <DocTitle
           title={title}

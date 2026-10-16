@@ -17,7 +17,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 
 class JwtServiceTest {
 
-  private static final String SECRET = "dGVzdC1vbmx5LXNlY3JldC1mb3ItY3Jld3JpdGUtand0LXRlc3RzLTEyMzQ1Njc4";
+  private static final String SECRET = "dGVzdC1vbmx5LXNlY3JldC1mb3ItY3Jld3N5bmMtand0LXRlc3RzLTEyMzQ1Njc4";
   private static final String OTHER_SECRET = "YW5vdGhlci1zZWNyZXQtdGhhdC1pcy1hbHNvLTMyLWJ5dGVzLWxvbmc=";
   private static final Instant NOW = Instant.parse("2026-10-16T12:00:00Z");
   private static final Duration TTL = Duration.ofDays(7);

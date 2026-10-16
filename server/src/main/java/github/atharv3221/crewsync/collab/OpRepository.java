@@ -1,5 +1,6 @@
 package github.atharv3221.crewsync.collab;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,4 +15,6 @@ public interface OpRepository extends JpaRepository<Op, Long> {
   List<Op> findAllByDocumentIdAndSeqGreaterThanOrderBySeqAsc(UUID docId, long seq);
 
   Optional<Op> findByDocumentIdAndOpKey(UUID docId, String opKey);
+
+  List<Op> findAllByDocumentIdAndOpKeyIn(UUID docId, Collection<String> opKeys);
 }

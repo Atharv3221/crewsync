@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import github.atharv3221.crewsync.document.Document;
 import github.atharv3221.crewsync.user.User;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,18 @@ class JpaOpLogTest {
 
     assertThat(opLog.append(docId, 2, insert(1))).isEqualTo(new SequencedOp(1, insert(1).json()));
     assertThat(opLog.maxSeq(docId)).isEqualTo(1);
+  }
+
+  @Test
+  void appendAllNumbersNewOpsConsecutivelyAndSkipsDuplicates() {
+    opLog.append(docId, 1, insert(1));
+
+    List<SequencedOp> stored = opLog.appendAll(docId, 2,
+        List.of(insert(2), insert(1), insert(3), insert(2)));
+
+    assertThat(stored).extracting(SequencedOp::seq).containsExactly(2L, 1L, 3L, 2L);
+    assertThat(opLog.opsAfter(docId, 0)).extracting(SequencedOp::seq)
+        .containsExactly(1L, 2L, 3L);
   }
 
   private static ClientOp insert(long counter) {

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,15 @@ final class TestSessions {
       throw new UncheckedIOException(exception);
     }
     return captor.getAllValues().stream().map(message -> JSON.readTree(message.getPayload())).toList();
+  }
+
+  /** Batching that never waits: the writer stores whatever is queued right away. */
+  static final DocRoom.Batching NO_WAIT = new DocRoom.Batching(100, Duration.ZERO);
+
+  /** A room whose writer runs inline on the submitting thread, so tests can assert right away. */
+  static DocRoom room(UUID docId, OpLog opLog) {
+    return new DocRoom(docId, opLog, new MessageCodec(JSON), NO_WAIT, Runnable::run, room -> {
+    });
   }
 
   static ClientOp insert(long counter, String site) {

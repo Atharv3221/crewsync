@@ -29,10 +29,10 @@
         </developer>
     </developers>
     <scm>
-        <connection>scm:git:https://github.com/Atharv3221/crewrite.git</connection>
-        <developerConnection>scm:git:git@github.com:Atharv3221/crewrite.git</developerConnection>
+        <connection>scm:git:https://github.com/Atharv3221/crewsync.git</connection>
+        <developerConnection>scm:git:git@github.com:Atharv3221/crewsync.git</developerConnection>
         <tag>HEAD</tag>
-        <url>https://github.com/Atharv3221/crewrite</url>
+        <url>https://github.com/Atharv3221/crewsync</url>
     </scm>
     <properties>
         <java.version>21</java.version>

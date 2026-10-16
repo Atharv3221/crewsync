@@ -1,18 +1,43 @@
 import type { CharId, DeleteOp, InsertOp, Op } from "./types";
-import { compareIds, idKey, opId, sameId } from "./ids";
+import { compareIds, idKey, opId } from "./ids";
 
 /** One character in the document, including deleted ones (tombstones). */
 interface Node {
   readonly id: CharId;
   readonly value: string;
   deleted: boolean;
+  /** The chunk holding this node; updated when chunks split. */
+  chunk: Chunk;
 }
+
+/** A run of consecutive nodes in document order, with its number of visible ones. */
+interface Chunk {
+  readonly nodes: Node[];
+  visible: number;
+  /** Position of this chunk in `chunks`; renumbered when a chunk is inserted. */
+  index: number;
+}
+
+/** A place between nodes: before `chunk.nodes[offset]` (or at the chunk's end). */
+interface Slot {
+  chunk: number;
+  offset: number;
+}
+
+/**
+ * Chunks split when they reach this size. Lookups walk the chunk list and then one chunk, so
+ * position ↔ node costs O(n / CHUNK + CHUNK), about O(√n) for documents up to a few hundred
+ * thousand characters, instead of scanning every node.
+ */
+const MAX_CHUNK = 512;
 
 export class Rga {
   private readonly site: string;
   private clock = 0;
-  private readonly nodes: Node[] = [];
+  /** The document in order, split into chunks. Never empty: holds at least one (maybe empty) chunk. */
+  private readonly chunks: Chunk[] = [{ nodes: [], visible: 0, index: 0 }];
   private readonly index = new Map<string, Node>();
+  private visibleCount = 0;
   private pending: Op[] = [];
 
   constructor(site: string) {
@@ -69,27 +94,29 @@ export class Rga {
     }
   }
 
+  /**
+   * Goes to the slot right after the origin, skips every node whose id is greater than the new
+   * one, and inserts there.
+   */
   private integrateInsert(op: InsertOp): boolean {
     const id = opId(op);
     const key = idKey(id);
     let applied = this.index.has(key);
     if (!applied) {
-      let slot = this.slotAfter(op.origin);
-      if (slot >= 0) {
+      const slot = this.slotAfter(op.origin);
+      if (slot !== null) {
         this.clock = Math.max(this.clock, op.counter);
-        while (
-          slot < this.nodes.length &&
-          compareIds(this.nodes[slot].id, id) > 0
-        ) {
-          slot++;
+        let next = this.nodeAt(slot);
+        while (next !== undefined && compareIds(next.id, id) > 0) {
+          slot.offset++;
+          next = this.nodeAt(slot);
         }
-        const node: Node = {
+        this.insertAt(slot, {
           id,
           value: op.value,
           deleted: false,
-        };
-        this.nodes.splice(slot, 0, node);
-        this.index.set(key, node);
+          chunk: this.chunks[0],
+        });
         applied = true;
       }
     }
@@ -101,7 +128,11 @@ export class Rga {
     const node = this.index.get(idKey(op.target));
     if (node !== undefined) {
       this.clock = Math.max(this.clock, op.counter);
-      node.deleted = true;
+      if (!node.deleted) {
+        node.deleted = true;
+        node.chunk.visible--;
+        this.visibleCount--;
+      }
     }
     return node !== undefined;
   }
@@ -115,24 +146,70 @@ export class Rga {
     }
   }
 
-  private slotAfter(origin: CharId | null): number {
-    let slot = 0;
+  /** The slot right after `origin` (null origin = start), or null if the origin is unknown. */
+  private slotAfter(origin: CharId | null): Slot | null {
+    let slot: Slot | null = { chunk: 0, offset: 0 };
     if (origin !== null) {
       const node = this.index.get(idKey(origin));
-      if (node === undefined) {
-        slot = -1;
-      } else {
-        slot = this.nodes.indexOf(node) + 1;
-      }
+      slot =
+        node === undefined
+          ? null
+          : {
+              chunk: node.chunk.index,
+              offset: node.chunk.nodes.indexOf(node) + 1,
+            };
     }
     return slot;
   }
 
+  /** The node right after `slot`, moving the slot past chunk ends; undefined at document end. */
+  private nodeAt(slot: Slot): Node | undefined {
+    while (
+      slot.offset >= this.chunks[slot.chunk].nodes.length &&
+      slot.chunk < this.chunks.length - 1
+    ) {
+      slot.chunk++;
+      slot.offset = 0;
+    }
+    return this.chunks[slot.chunk].nodes[slot.offset];
+  }
+
+  private insertAt(slot: Slot, node: Node): void {
+    const chunk = this.chunks[slot.chunk];
+    chunk.nodes.splice(slot.offset, 0, node);
+    node.chunk = chunk;
+    chunk.visible++;
+    this.visibleCount++;
+    this.index.set(idKey(node.id), node);
+    if (chunk.nodes.length >= MAX_CHUNK) {
+      this.split(chunk);
+    }
+  }
+
+  /** Moves the second half of `chunk` into a new chunk right after it. */
+  private split(chunk: Chunk): void {
+    const moved = chunk.nodes.splice(chunk.nodes.length >> 1);
+    const fresh: Chunk = { nodes: moved, visible: 0, index: chunk.index + 1 };
+    for (const node of moved) {
+      node.chunk = fresh;
+      if (!node.deleted) {
+        fresh.visible++;
+      }
+    }
+    chunk.visible -= fresh.visible;
+    this.chunks.splice(fresh.index, 0, fresh);
+    for (let i = fresh.index + 1; i < this.chunks.length; i++) {
+      this.chunks[i].index = i;
+    }
+  }
+
   text(): string {
     let out = "";
-    for (const node of this.nodes) {
-      if (!node.deleted) {
-        out += node.value;
+    for (const chunk of this.chunks) {
+      for (const node of chunk.nodes) {
+        if (!node.deleted) {
+          out += node.value;
+        }
       }
     }
     return out;
@@ -150,31 +227,36 @@ export class Rga {
     return id;
   }
 
-  /** Inverse of idAt: the cursor position just right of character `id`. */
+  /**
+   * Inverse of idAt: the cursor position just right of character `id`, i.e. the number of
+   * visible characters up to and including it. An unknown id maps to the end.
+   */
   posOf(id: CharId | null): number {
     let pos = 0;
     if (id !== null) {
-      for (const node of this.nodes) {
-        if (!node.deleted) {
-          pos++;
+      const node = this.index.get(idKey(id));
+      if (node === undefined) {
+        pos = this.visibleCount;
+      } else {
+        for (let i = 0; i < node.chunk.index; i++) {
+          pos += this.chunks[i].visible;
         }
-        if (sameId(node.id, id)) {
-          break;
+        for (const other of node.chunk.nodes) {
+          if (!other.deleted) {
+            pos++;
+          }
+          if (other === node) {
+            break;
+          }
         }
       }
     }
     return pos;
   }
 
-  /** Number of visible characters; cheaper than text().length (no string building). */
+  /** Number of visible characters. */
   get length(): number {
-    let count = 0;
-    for (const node of this.nodes) {
-      if (!node.deleted) {
-        count += 1;
-      }
-    }
-    return count;
+    return this.visibleCount;
   }
 
   get pendingCount(): number {
@@ -182,15 +264,22 @@ export class Rga {
   }
 
   private visibleNode(pos: number): Node {
-    let seen = 0;
     let found: Node | undefined;
-    for (const node of this.nodes) {
-      if (!node.deleted) {
-        if (seen === pos) {
-          found = node;
-          break;
+    if (pos >= 0 && pos < this.visibleCount) {
+      let remaining = pos;
+      let c = 0;
+      while (remaining >= this.chunks[c].visible) {
+        remaining -= this.chunks[c].visible;
+        c++;
+      }
+      for (const node of this.chunks[c].nodes) {
+        if (!node.deleted) {
+          if (remaining === 0) {
+            found = node;
+            break;
+          }
+          remaining--;
         }
-        seen++;
       }
     }
     if (found === undefined) {
